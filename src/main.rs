@@ -41,6 +41,25 @@ fn entry() -> Result<(), ()> {
                     usage(&program);
                 }
             }
+            "update" | "u" => {
+                if let Some(arg) = args.next() {
+                    match arg.parse() {
+                        Ok(index) => {
+                            if let Some(arg) = args.next() {
+                                update_task(index, arg, filepath);
+                            } else {
+                                usage(&program);
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to parse index: {err}");
+                            return Err(());
+                        }
+                    }
+                } else {
+                    usage(&program);
+                }
+            }
             "help" | "-h" | "h" => usage(&program),
             _ => usage(&program),
         }
@@ -55,9 +74,10 @@ fn entry() -> Result<(), ()> {
 fn usage(program: &str) {
     eprintln!("USAGE: {program} <subcommand> [task]");
     eprintln!("\th[elp]:\tShow usage");
-    eprintln!("\ta[dd]:\tAdd a new task");
+    eprintln!("\ta[dd] <task>:\tAdd a new task");
     eprintln!("\tl[ist]:\tList all tasks");
-    eprintln!("\td[one]:\tDelete a task");
+    eprintln!("\td[one] <index>:\tDelete a task");
+    eprintln!("\tu[pdate] <index> <new_task>:\tUpdate an existing task");
 }
 
 fn add_new(task: String, filepath: &str) {
@@ -98,14 +118,36 @@ fn delete_todo(index: u32, filepath: &str) {
 
     for line in content.lines() {
         if i == index {
+            println!("Task {i} Deleted");
             i += 1;
             continue;
         }
         writeln!(&mut writer, "{line}").expect("ERROR: Failed to write line: {line}");
         i += 1;
     }
+}
 
-    println!("Task Deleted");
+fn update_task(index: u32, new_task: String, filepath: &str) {
+    let mut i = 1;
+    let buf = read_file(filepath);
+    let mut writer = BufWriter::new(
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(filepath)
+            .expect("ERROR: Failed to truncate {filepath}"),
+    );
+
+    for mut line in buf.lines() {
+        if i == index {
+            line = &new_task;
+            println!("Task Updated");
+            println!("{i}: {line}");
+        }
+        writeln!(&mut writer, "{line}").expect("ERROR: Failed to write line: {line}");
+        i += 1;
+    }
 }
 
 fn read_file(filepath: &str) -> String {
