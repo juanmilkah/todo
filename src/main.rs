@@ -13,6 +13,7 @@ fn main() {
 fn entry() -> Result<(), ()> {
     let mut args = env::args();
     let filepath = "tasks.txt";
+    tasks_exists(filepath);
 
     if let Some(program) = args.next() {
         let subcommand = args.next().unwrap_or("list".to_string());
@@ -40,6 +41,7 @@ fn entry() -> Result<(), ()> {
                     usage(&program);
                 }
             }
+            "help" | "-h" | "h" => usage(&program),
             _ => usage(&program),
         }
 
@@ -51,7 +53,11 @@ fn entry() -> Result<(), ()> {
 }
 
 fn usage(program: &str) {
-    eprintln!("USAGE: {program} <subcommand>");
+    eprintln!("USAGE: {program} <subcommand> [task]");
+    eprintln!("\th[elp]:\tShow usage");
+    eprintln!("\ta[dd]:\tAdd a new task");
+    eprintln!("\tl[ist]:\tList all tasks");
+    eprintln!("\td[one]:\tDelete a task");
 }
 
 fn add_new(task: String, filepath: &str) {
@@ -67,6 +73,10 @@ fn add_new(task: String, filepath: &str) {
 
 fn list_all(filepath: &str) {
     let buf = read_file(filepath);
+    if buf.is_empty() {
+        println!("No Tasks!");
+        return;
+    }
     let mut index = 1;
     for line in buf.lines() {
         println!("{index}: {line:?}");
@@ -104,4 +114,12 @@ fn read_file(filepath: &str) -> String {
         .read_to_string(&mut content)
         .unwrap();
     content
+}
+fn tasks_exists(filepath: &str) {
+    match File::open(filepath) {
+        Ok(_) => (),
+        Err(_) => {
+            File::create(filepath).expect("ERROR: Failed to cerate tasks file");
+        }
+    }
 }
