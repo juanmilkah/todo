@@ -72,12 +72,12 @@ fn entry() -> Result<(), ()> {
 }
 
 fn usage(program: &str) {
-    eprintln!("USAGE: {program} <subcommand> [task]");
-    eprintln!("\th[elp]:\tShow usage");
-    eprintln!("\ta[dd] <task>:\tAdd a new task");
-    eprintln!("\tl[ist]:\tList all tasks");
-    eprintln!("\td[one] <index>:\tDelete a task");
-    eprintln!("\tu[pdate] <index> <new_task>:\tUpdate an existing task");
+    eprintln!("USAGE: {program} <subcommand>");
+    eprintln!("\th[elp]:                        Show usage");
+    eprintln!("\ta[dd] <task>:                  Add a new task");
+    eprintln!("\tl[ist]:                        List all tasks");
+    eprintln!("\td[one] <index>:                Delete a task");
+    eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
 }
 
 fn add_new(task: String, filepath: &str) {
