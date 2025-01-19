@@ -12,26 +12,28 @@ fn main() {
 
 fn entry() -> Result<(), ()> {
     let mut args = env::args();
-    let filepath = "tasks.txt";
-    tasks_exists(filepath);
+    let home_dir = env::home_dir().expect("ERROR: Failed to get $HOME");
+
+    let filepath = format!("{home}/.tasks.txt", home = home_dir.display());
+    tasks_exists(&filepath);
 
     if let Some(program) = args.next() {
         let subcommand = args.next().unwrap_or("list".to_string());
 
         match subcommand.as_str() {
-            "add" | "a" => {
+            "add" | "a" | "new" | "n" => {
                 if let Some(argument) = args.next() {
-                    add_new(argument, filepath);
+                    add_new(argument, &filepath);
                 } else {
                     usage(&program);
                 }
             }
-            "list" | "l" => list_all(filepath),
+            "list" | "l" => list_all(&filepath),
 
             "done" | "d" => {
                 if let Some(arg) = args.next() {
                     match arg.parse() {
-                        Ok(index) => delete_todo(index, filepath),
+                        Ok(index) => delete_todo(index, &filepath),
                         Err(err) => {
                             eprintln!("Failed to parse index: {err}");
                             return Err(());
@@ -46,7 +48,7 @@ fn entry() -> Result<(), ()> {
                     match arg.parse() {
                         Ok(index) => {
                             if let Some(arg) = args.next() {
-                                update_task(index, arg, filepath);
+                                update_task(index, arg, &filepath);
                             } else {
                                 usage(&program);
                             }
@@ -75,6 +77,7 @@ fn usage(program: &str) {
     eprintln!("USAGE: {program} <subcommand>");
     eprintln!("\th[elp]:                        Show usage");
     eprintln!("\ta[dd] <task>:                  Add a new task");
+    eprintln!("\tn[ew] <task>:                  Add a new task");
     eprintln!("\tl[ist]:                        List all tasks");
     eprintln!("\td[one] <index>:                Delete a task");
     eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
@@ -161,7 +164,7 @@ fn tasks_exists(filepath: &str) {
     match File::open(filepath) {
         Ok(_) => (),
         Err(_) => {
-            File::create(filepath).expect("ERROR: Failed to cerate tasks file");
+            File::create(filepath).expect("ERROR: Failed to create tasks file");
         }
     }
 }
