@@ -1,6 +1,7 @@
-use std::env;
+use std::env::{self};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() {
@@ -12,9 +13,9 @@ fn main() {
 
 fn entry() -> Result<(), ()> {
     let mut args = env::args();
-    let home_dir = env::home_dir().expect("ERROR: Failed to get $HOME");
+    let home = home::home_dir().unwrap_or(PathBuf::from("."));
+    let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
 
-    let filepath = format!("{home}/.tasks.txt", home = home_dir.display());
     tasks_exists(&filepath);
 
     if let Some(program) = args.next() {
