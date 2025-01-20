@@ -82,8 +82,7 @@ fn entry() -> Result<(), ()> {
 fn usage(program: &str) {
     eprintln!("USAGE: {program} <subcommand>");
     eprintln!("\th[elp]:                        Show usage");
-    eprintln!("\ta[dd] <task>:                  Add a new task");
-    eprintln!("\tn[ew] <task>:                  Add a new task");
+    eprintln!("\ta[dd] | n[new] <task>:         Add a new task");
     eprintln!("\tl[ist]:                        List all tasks");
     eprintln!("\td[one] <..indexes> | all:      Delete a task");
     eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
