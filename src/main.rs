@@ -85,7 +85,7 @@ fn usage(program: &str) {
     eprintln!("\ta[dd] <task>:                  Add a new task");
     eprintln!("\tn[ew] <task>:                  Add a new task");
     eprintln!("\tl[ist]:                        List all tasks");
-    eprintln!("\td[one] <index>:                Delete a task");
+    eprintln!("\td[one] <..indexes> | all:      Delete a task");
     eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
 }
 
