@@ -87,12 +87,17 @@ fn usage(program: &str) {
 fn add_new(task: String, filepath: &str) {
     let mut file = BufWriter::new(
         OpenOptions::new()
+            .read(true)
             .append(true)
             .open(filepath)
-            .expect("Failed to open {filepath}"),
+            .expect("Failed to open file"),
     );
+
+    let content = read_file(filepath);
+    let count = content.lines().count();
+
     writeln!(&mut file, "{task}").expect("ERROR: Failed to write new task");
-    println!("New Task added");
+    println!("Task {count} Added", count = count + 1);
 }
 
 fn list_all(filepath: &str) {
@@ -117,7 +122,7 @@ fn delete_todo(index: u32, filepath: &str) {
             .write(true)
             .truncate(true)
             .open(filepath)
-            .expect("ERROR: Failed to truncate {filepath}"),
+            .expect("ERROR: Failed to truncate file"),
     );
 
     for line in content.lines() {
@@ -126,7 +131,9 @@ fn delete_todo(index: u32, filepath: &str) {
             i += 1;
             continue;
         }
-        writeln!(&mut writer, "{line}").expect("ERROR: Failed to write line: {line}");
+        let _ = writeln!(&mut writer, "{line}").map_err(|err| {
+            eprintln!("Failed to write line: {line} :{err}");
+        });
         i += 1;
     }
 }
@@ -140,7 +147,7 @@ fn update_task(index: u32, new_task: String, filepath: &str) {
             .write(true)
             .truncate(true)
             .open(filepath)
-            .expect("ERROR: Failed to truncate {filepath}"),
+            .expect("Failed to open file"),
     );
 
     for mut line in buf.lines() {
@@ -149,7 +156,10 @@ fn update_task(index: u32, new_task: String, filepath: &str) {
             println!("Task Updated");
             println!("{i}: {line}");
         }
-        writeln!(&mut writer, "{line}").expect("ERROR: Failed to write line: {line}");
+
+        let _ = writeln!(&mut writer, "{line}").map_err(|err| {
+            eprintln!("Failed to write line: {line} :{err}");
+        });
         i += 1;
     }
 }
