@@ -32,17 +32,17 @@ fn entry() -> Result<(), ()> {
             "list" | "l" => list_all(&filepath),
 
             "done" | "d" => {
-                if let Some(arg) = args.next() {
+                let mut indexes: Vec<u32> = Vec::new();
+                while let Some(arg) = &args.next() {
                     match arg.parse() {
-                        Ok(index) => delete_todo(index, &filepath),
+                        Ok(index) => indexes.push(index),
                         Err(err) => {
                             eprintln!("Failed to parse index: {err}");
                             return Err(());
                         }
                     }
-                } else {
-                    usage(&program);
                 }
+                delete_todo(indexes, &filepath);
             }
             "update" | "u" => {
                 if let Some(arg) = args.next() {
@@ -113,7 +113,7 @@ fn list_all(filepath: &str) {
     }
 }
 
-fn delete_todo(index: u32, filepath: &str) {
+fn delete_todo(indexes: Vec<u32>, filepath: &str) {
     let content = read_file(filepath);
     let mut i = 1;
     let mut writer = BufWriter::new(
@@ -126,7 +126,7 @@ fn delete_todo(index: u32, filepath: &str) {
     );
 
     for line in content.lines() {
-        if i == index {
+        if indexes.contains(&i) {
             println!("Task {i} Deleted");
             i += 1;
             continue;

@@ -7,9 +7,18 @@ Feel free to contribute to support other platforms.
 ## Features
 - Add new note 
 - Update an existing note 
-- Delete a note 
+- Delete a note or more notes
 - List all notes 
 
+
+```bash
+todo new "foo"
+todo list 
+todo new "bar"
+todo new "baz"
+todo done 3 1
+todo update 1 "barbar"
+```
 ## Installation
 Clone the github repository
 Build the program.
