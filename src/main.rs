@@ -12,7 +12,7 @@ fn main() {
 }
 
 fn entry() -> Result<(), ()> {
-    let mut args = env::args();
+    let mut args = env::args().peekable();
     let home = home::home_dir().unwrap_or(PathBuf::from("."));
     let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
 
@@ -32,13 +32,19 @@ fn entry() -> Result<(), ()> {
             "list" | "l" => list_all(&filepath),
 
             "done" | "d" => {
+                if let Some(arg) = args.peek() {
+                    if arg == "all" {
+                        delete_all(&filepath);
+                        return Ok(());
+                    }
+                }
+
                 let mut indexes: Vec<u32> = Vec::new();
                 while let Some(arg) = &args.next() {
                     match arg.parse() {
                         Ok(index) => indexes.push(index),
                         Err(err) => {
-                            eprintln!("Failed to parse index: {err}");
-                            return Err(());
+                            eprintln!("{err}: \"{arg}\"");
                         }
                     }
                 }
@@ -55,8 +61,7 @@ fn entry() -> Result<(), ()> {
                             }
                         }
                         Err(err) => {
-                            eprintln!("Failed to parse index: {err}");
-                            return Err(());
+                            eprintln!("{err}: \"{arg}\"");
                         }
                     }
                 } else {
@@ -139,6 +144,18 @@ fn delete_todo(indexes: Vec<u32>, filepath: &str) {
         });
         i += 1;
     }
+}
+
+fn delete_all(filepath: &str) {
+    let _ = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(filepath)
+        .map_err(|err| {
+            eprintln!("ERROR: Failed to open file {filepath}: {err}");
+        });
+
+    println!("All Tasks Deleted!");
 }
 
 fn update_task(index: u32, new_task: String, filepath: &str) {
