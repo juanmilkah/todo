@@ -23,11 +23,11 @@ fn entry() -> Result<(), ()> {
 
         match subcommand.as_str() {
             "add" | "a" | "new" | "n" => {
-                if let Some(argument) = args.next() {
-                    add_new(argument, &filepath);
-                } else {
-                    usage(&program);
+                let mut tasks: Vec<String> = Vec::new();
+                while let Some(argument) = &args.next() {
+                    tasks.push(argument.to_string());
                 }
+                add_new(tasks, &filepath);
             }
             "list" | "l" => list_all(&filepath),
 
@@ -84,7 +84,7 @@ fn usage(program: &str) {
     eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
 }
 
-fn add_new(task: String, filepath: &str) {
+fn add_new(tasks: Vec<String>, filepath: &str) {
     let mut file = BufWriter::new(
         OpenOptions::new()
             .read(true)
@@ -94,10 +94,13 @@ fn add_new(task: String, filepath: &str) {
     );
 
     let content = read_file(filepath);
-    let count = content.lines().count();
+    let mut count = content.lines().count();
 
-    writeln!(&mut file, "{task}").expect("ERROR: Failed to write new task");
-    println!("Task {count} Added", count = count + 1);
+    for task in tasks {
+        writeln!(&mut file, "{task}").expect("ERROR: Failed to write new task");
+        count += 1;
+        println!("Task {count} Added");
+    }
 }
 
 fn list_all(filepath: &str) {
