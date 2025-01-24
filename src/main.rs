@@ -1,4 +1,4 @@
-use std::env::{self};
+use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
@@ -48,7 +48,7 @@ fn entry() -> Result<(), ()> {
                         }
                     }
                 }
-                delete_todo(indexes, &filepath);
+                delete_todos(indexes, &filepath);
             }
             "update" | "u" => {
                 if let Some(arg) = args.next() {
@@ -120,7 +120,7 @@ fn list_all(filepath: &str) {
     }
 }
 
-fn delete_todo(indexes: Vec<u32>, filepath: &str) {
+fn delete_todos(indexes: Vec<u32>, filepath: &str) {
     let content = read_file(filepath);
     let mut i = 1;
     let mut writer = BufWriter::new(

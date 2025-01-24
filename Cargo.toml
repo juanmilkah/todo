@@ -1,6 +1,6 @@
 [package]
 name = "todo"
-description = "A simple Tasks Manager"
+description = "A Commandline Tasks Manager"
 version = "0.1.0"
 edition = "2021"
 authors = ["Juan Milkah <juanmilkah@gmail.com>"]
