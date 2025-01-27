@@ -1,22 +1,22 @@
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{self, BufReader, BufWriter, Read, Result, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() {
     match entry() {
         Ok(()) => ExitCode::SUCCESS,
-        Err(()) => ExitCode::FAILURE,
+        Err(_) => ExitCode::FAILURE,
     };
 }
 
-fn entry() -> Result<(), ()> {
+fn entry() -> Result<()> {
     let mut args = env::args().peekable();
     let home = home::home_dir().unwrap_or(PathBuf::from("."));
     let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
 
-    tasks_exists(&filepath);
+    tasks_exists(&filepath)?;
 
     if let Some(program) = args.next() {
         let subcommand = args.next().unwrap_or("list".to_string());
@@ -27,14 +27,14 @@ fn entry() -> Result<(), ()> {
                 while let Some(argument) = &args.next() {
                     tasks.push(argument.to_string());
                 }
-                add_new(tasks, &filepath);
+                add_new(tasks, &filepath)?;
             }
-            "list" | "l" => list_all(&filepath),
+            "list" | "l" => list_all(&filepath)?,
 
             "done" | "d" => {
                 if let Some(arg) = args.peek() {
                     if arg == "all" {
-                        delete_all(&filepath);
+                        delete_all(&filepath)?;
                         return Ok(());
                     }
                 }
@@ -48,14 +48,14 @@ fn entry() -> Result<(), ()> {
                         }
                     }
                 }
-                delete_todos(indexes, &filepath);
+                delete_todos(indexes, &filepath)?;
             }
             "update" | "u" => {
                 if let Some(arg) = args.next() {
                     match arg.parse() {
                         Ok(index) => {
                             if let Some(arg) = args.next() {
-                                update_task(index, arg, &filepath);
+                                update_task(index, arg, &filepath)?;
                             } else {
                                 usage(&program);
                             }
@@ -75,8 +75,10 @@ fn entry() -> Result<(), ()> {
         return Ok(());
     }
 
-    eprintln!("Failed to parse program arguments");
-    Err(())
+    Err(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "Failed to parse program arguments",
+    ))
 }
 
 fn usage(program: &str) {
@@ -88,48 +90,45 @@ fn usage(program: &str) {
     eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
 }
 
-fn add_new(tasks: Vec<String>, filepath: &str) {
-    let mut file = BufWriter::new(
-        OpenOptions::new()
-            .read(true)
-            .append(true)
-            .open(filepath)
-            .expect("Failed to open file"),
-    );
+fn add_new(tasks: Vec<String>, filepath: &str) -> Result<()> {
+    let mut file = BufWriter::new(OpenOptions::new().read(true).append(true).open(filepath)?);
 
-    let content = read_file(filepath);
+    let content = read_file(filepath)?;
     let mut count = content.lines().count();
 
     for task in tasks {
-        writeln!(&mut file, "{task}").expect("ERROR: Failed to write new task");
+        writeln!(&mut file, "{task}")?;
         count += 1;
         println!("Task {count} Added");
     }
+
+    Ok(())
 }
 
-fn list_all(filepath: &str) {
-    let buf = read_file(filepath);
+fn list_all(filepath: &str) -> Result<()> {
+    let buf = read_file(filepath)?;
     if buf.is_empty() {
         println!("No Tasks!");
-        return;
+        return Ok(());
     }
     let mut index = 1;
     for line in buf.lines() {
         println!("{index}: {line:?}");
         index += 1;
     }
+
+    Ok(())
 }
 
-fn delete_todos(indexes: Vec<u32>, filepath: &str) {
-    let content = read_file(filepath);
+fn delete_todos(indexes: Vec<u32>, filepath: &str) -> Result<()> {
+    let content = read_file(filepath)?;
     let mut i = 1;
     let mut writer = BufWriter::new(
         OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(filepath)
-            .expect("ERROR: Failed to truncate file"),
+            .open(filepath)?,
     );
 
     for line in content.lines() {
@@ -143,30 +142,29 @@ fn delete_todos(indexes: Vec<u32>, filepath: &str) {
         });
         i += 1;
     }
+
+    Ok(())
 }
 
-fn delete_all(filepath: &str) {
-    let _ = OpenOptions::new()
+fn delete_all(filepath: &str) -> Result<()> {
+    OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(filepath)
-        .map_err(|err| {
-            eprintln!("ERROR: Failed to open file {filepath}: {err}");
-        });
+        .open(filepath)?;
 
     println!("All Tasks Deleted!");
+    Ok(())
 }
 
-fn update_task(index: u32, new_task: String, filepath: &str) {
+fn update_task(index: u32, new_task: String, filepath: &str) -> Result<()> {
     let mut i = 1;
-    let buf = read_file(filepath);
+    let buf = read_file(filepath)?;
     let mut writer = BufWriter::new(
         OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(filepath)
-            .expect("Failed to open file"),
+            .open(filepath)?,
     );
 
     for mut line in buf.lines() {
@@ -181,20 +179,20 @@ fn update_task(index: u32, new_task: String, filepath: &str) {
         });
         i += 1;
     }
+
+    Ok(())
 }
 
-fn read_file(filepath: &str) -> String {
+fn read_file(filepath: &str) -> Result<String> {
     let mut content = String::new();
-    BufReader::new(File::open(filepath).unwrap())
-        .read_to_string(&mut content)
-        .unwrap();
-    content
+    BufReader::new(File::open(filepath)?).read_to_string(&mut content)?;
+    Ok(content)
 }
-fn tasks_exists(filepath: &str) {
+fn tasks_exists(filepath: &str) -> Result<()> {
     match File::open(filepath) {
-        Ok(_) => (),
-        Err(_) => {
-            File::create(filepath).expect("ERROR: Failed to create tasks file");
-        }
-    }
+        Ok(_) => return Ok(()),
+        Err(_) => File::create(filepath)?,
+    };
+
+    Ok(())
 }
