@@ -1,8 +1,8 @@
-use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, BufWriter, Read, Result, Write};
+use std::io::{self, BufWriter, Result, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::{env, fs};
 
 fn main() {
     match entry() {
@@ -91,11 +91,17 @@ fn usage(program: &str) {
 }
 
 fn add_new(tasks: Vec<String>, filepath: &str) -> Result<()> {
-    let mut file = BufWriter::new(OpenOptions::new().read(true).append(true).open(filepath)?);
+    let content = match fs::read_to_string(filepath) {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Failed to read {filepath}: {err}");
+            return Err(err);
+        }
+    };
 
-    let content = read_file(filepath)?;
     let mut count = content.lines().count();
 
+    let mut file = BufWriter::new(OpenOptions::new().read(true).append(true).open(filepath)?);
     for task in tasks {
         writeln!(&mut file, "{task}")?;
         count += 1;
@@ -106,7 +112,13 @@ fn add_new(tasks: Vec<String>, filepath: &str) -> Result<()> {
 }
 
 fn list_all(filepath: &str) -> Result<()> {
-    let buf = read_file(filepath)?;
+    let buf = match fs::read_to_string(filepath) {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Failed to read {filepath}: {err}");
+            return Err(err);
+        }
+    };
     if buf.is_empty() {
         println!("No Tasks!");
         return Ok(());
@@ -121,7 +133,13 @@ fn list_all(filepath: &str) -> Result<()> {
 }
 
 fn delete_todos(indexes: Vec<u32>, filepath: &str) -> Result<()> {
-    let content = read_file(filepath)?;
+    let content = match fs::read_to_string(filepath) {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Failed to read {filepath}: {err}");
+            return Err(err);
+        }
+    };
     let mut i = 1;
     let mut writer = BufWriter::new(
         OpenOptions::new()
@@ -158,7 +176,13 @@ fn delete_all(filepath: &str) -> Result<()> {
 
 fn update_task(index: u32, new_task: String, filepath: &str) -> Result<()> {
     let mut i = 1;
-    let buf = read_file(filepath)?;
+    let buf = match fs::read_to_string(filepath) {
+        Ok(val) => val,
+        Err(err) => {
+            eprintln!("Failed to read {filepath}: {err}");
+            return Err(err);
+        }
+    };
     let mut writer = BufWriter::new(
         OpenOptions::new()
             .create(true)
@@ -183,13 +207,8 @@ fn update_task(index: u32, new_task: String, filepath: &str) -> Result<()> {
     Ok(())
 }
 
-fn read_file(filepath: &str) -> Result<String> {
-    let mut content = String::new();
-    BufReader::new(File::open(filepath)?).read_to_string(&mut content)?;
-    Ok(content)
-}
 fn tasks_exists(filepath: &str) -> Result<()> {
-    match File::open(filepath) {
+    match fs::exists(filepath) {
         Ok(_) => return Ok(()),
         Err(_) => File::create(filepath)?,
     };
