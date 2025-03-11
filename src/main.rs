@@ -1,17 +1,9 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufWriter, Result, Write};
 use std::path::PathBuf;
-use std::process::ExitCode;
 use std::{env, fs};
 
-fn main() {
-    match entry() {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(_) => ExitCode::FAILURE,
-    };
-}
-
-fn entry() -> Result<()> {
+fn main() -> Result<()> {
     let mut args = env::args().peekable();
     let home = home::home_dir().unwrap_or(PathBuf::from("."));
     let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
@@ -21,17 +13,17 @@ fn entry() -> Result<()> {
     if let Some(program) = args.next() {
         let subcommand = args.next().unwrap_or("list".to_string());
 
-        match subcommand.as_str() {
-            "add" | "a" | "new" | "n" => {
+        match subcommand.chars().next().expect("Invalid utf-8 characters") {
+            'a' | 'n' => {
                 let mut tasks: Vec<String> = Vec::new();
                 while let Some(argument) = &args.next() {
                     tasks.push(argument.to_string());
                 }
                 add_new(tasks, &filepath)?;
             }
-            "list" | "l" => list_all(&filepath)?,
+            'l' => list_all(&filepath)?,
 
-            "done" | "d" => {
+            'd' => {
                 if let Some(arg) = args.peek() {
                     if arg == "all" {
                         delete_all(&filepath)?;
@@ -50,7 +42,7 @@ fn entry() -> Result<()> {
                 }
                 delete_todos(indexes, &filepath)?;
             }
-            "update" | "u" => {
+            'u' => {
                 if let Some(arg) = args.next() {
                     match arg.parse() {
                         Ok(index) => {
@@ -68,7 +60,7 @@ fn entry() -> Result<()> {
                     usage(&program);
                 }
             }
-            "help" | "-h" | "h" => usage(&program),
+            'h' => usage(&program),
             _ => usage(&program),
         }
 
