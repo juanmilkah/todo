@@ -1,85 +1,73 @@
+use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufWriter, Result, Write};
+use std::io::{BufWriter, Result, Write};
 use std::path::PathBuf;
-use std::{env, fs};
+
+use clap::{Parser, Subcommand};
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Parser)]
+#[command(version = VERSION, about = "A Minimalistic task manager", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Add one or more new tasks
+    Add {
+        /// Task description(s)
+        tasks: Vec<String>,
+    },
+
+    /// List all tasks
+    List,
+
+    /// Delete task(s) by their indices, or pass "all" to delete everything
+    Done {
+        /// Task index(es) to delete, or "all" to delete all tasks
+        indices: Vec<String>,
+    },
+
+    /// Update a task at the given index
+    Update {
+        /// The index of the task to update
+        index: u32,
+        /// The new task description
+        new_task: String,
+    },
+}
 
 fn main() -> Result<()> {
-    let mut args = env::args().peekable();
+    let args = Cli::parse();
     let home = home::home_dir().unwrap_or(PathBuf::from("."));
     let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
 
     tasks_exists(&filepath)?;
 
-    if let Some(program) = args.next() {
-        let subcommand = args.next().unwrap_or("list".to_string());
+    match args.command {
+        Commands::List => list_all(&filepath),
+        Commands::Add { tasks } => add_new(tasks, &filepath),
+        Commands::Done { indices } => {
+            if indices.len() == 1 && indices[0] == "all" {
+                delete_all(&filepath)
+            } else {
+                let mut indices_vec = Vec::new();
 
-        match subcommand.chars().next().expect("Invalid utf-8 characters") {
-            'a' | 'n' => {
-                let mut tasks: Vec<String> = Vec::new();
-                while let Some(argument) = &args.next() {
-                    tasks.push(argument.to_string());
-                }
-                add_new(tasks, &filepath)?;
-            }
-            'l' => list_all(&filepath)?,
-
-            'd' => {
-                if let Some(arg) = args.peek() {
-                    if arg == "all" {
-                        delete_all(&filepath)?;
-                        return Ok(());
+                for idx in indices {
+                    match idx.parse::<u32>() {
+                        Ok(value) => indices_vec.push(value),
+                        Err(e) => eprintln!("Failed to parse index: {}: {}", idx, e),
                     }
                 }
 
-                let mut indexes: Vec<u32> = Vec::new();
-                while let Some(arg) = &args.next() {
-                    match arg.parse() {
-                        Ok(index) => indexes.push(index),
-                        Err(err) => {
-                            eprintln!("{err}: \"{arg}\"");
-                        }
-                    }
-                }
-                delete_todos(indexes, &filepath)?;
+                delete_todos(indices_vec, &filepath)
             }
-            'u' => {
-                if let Some(arg) = args.next() {
-                    match arg.parse() {
-                        Ok(index) => {
-                            if let Some(arg) = args.next() {
-                                update_task(index, arg, &filepath)?;
-                            } else {
-                                usage(&program);
-                            }
-                        }
-                        Err(err) => {
-                            eprintln!("{err}: \"{arg}\"");
-                        }
-                    }
-                } else {
-                    usage(&program);
-                }
-            }
-            'h' => usage(&program),
-            _ => usage(&program),
         }
-
-        return Ok(());
+        Commands::Update { index, new_task } => update_task(index, new_task, &filepath),
     }
-
-    Err(io::Error::new(
-        io::ErrorKind::InvalidInput,
-        "Failed to parse program arguments",
-    ))
-}
-
-fn usage(program: &str) {
-    eprintln!("USAGE: {program} <subcommand>");
-    eprintln!("\th[elp]:                        Show usage");
-    eprintln!("\ta[dd] | n[new] <task>:         Add a new task");
-    eprintln!("\tl[ist]:                        List all tasks");
-    eprintln!("\td[one] <..indexes> | all:      Delete a task");
-    eprintln!("\tu[pdate] <index> <new_task>:   Update an existing task");
 }
 
 fn add_new(tasks: Vec<String>, filepath: &str) -> Result<()> {
@@ -124,6 +112,15 @@ fn list_all(filepath: &str) -> Result<()> {
     Ok(())
 }
 
+fn delete_all(filepath: &str) -> Result<()> {
+    OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(filepath)?;
+    println!("All Tasks Deleted!");
+    Ok(())
+}
+
 fn delete_todos(indexes: Vec<u32>, filepath: &str) -> Result<()> {
     let content = match fs::read_to_string(filepath) {
         Ok(val) => val,
@@ -153,16 +150,6 @@ fn delete_todos(indexes: Vec<u32>, filepath: &str) -> Result<()> {
         i += 1;
     }
 
-    Ok(())
-}
-
-fn delete_all(filepath: &str) -> Result<()> {
-    OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(filepath)?;
-
-    println!("All Tasks Deleted!");
     Ok(())
 }
 
