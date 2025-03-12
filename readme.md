@@ -38,6 +38,3 @@ The project is licensed under the [GNU GPL3](LICENSE)
 - Fork the repo 
 - Create new branch "feature/foo"
 - Create a pull request 
-
-## Or 
-- Reach out via email

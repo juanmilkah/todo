@@ -1,10 +1,11 @@
 [package]
 name = "todo"
 description = "A Commandline Tasks Manager"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Juan Milkah <juanmilkah@gmail.com>"]
 license = "GNU GPL3"
 
 [dependencies]
+clap = { version = "4.5.32", features = ["derive"] }
 home ="0.5.11" 
