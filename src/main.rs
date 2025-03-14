@@ -17,7 +17,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Add one or more new tasks
-    Add {
+    New {
         /// Task description(s)
         tasks: Vec<String>,
     },
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
 
     match args.command {
         Commands::List => list_all(&filepath),
-        Commands::Add { tasks } => add_new(tasks, &filepath),
+        Commands::New { tasks } => add_new(tasks, &filepath),
         Commands::Done { indices } => {
             if indices.len() == 1 && indices[0] == "all" {
                 delete_all(&filepath)
