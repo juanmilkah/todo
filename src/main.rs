@@ -1,9 +1,11 @@
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Result, Write};
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{self, stdin, BufRead, Result, Write};
 use std::path::PathBuf;
+use std::{fs, process};
 
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -16,181 +18,240 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add one or more new tasks
-    New {
-        /// Task description(s)
-        tasks: Vec<String>,
-    },
+    /// Create new task.
+    New,
 
-    /// List all tasks
+    /// List all tasks heads
     List,
 
-    /// Delete task(s) by their indices, or pass "all" to delete everything
+    /// Get the full task
+    Get {
+        /// Task Id
+        id: u64,
+    },
+
+    /// Delete task(s) by their id
     Done {
-        /// Task index(es) to delete, or "all" to delete all tasks
-        indices: Vec<String>,
+        /// Task id(s) to delete.
+        indices: Vec<u64>,
     },
 
     /// Update a task at the given index
     Update {
         /// The index of the task to update
-        index: u32,
-        /// The new task description
-        new_task: String,
+        index: u64,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Task {
+    id: u64,
+    head: String,
+    body: String,
+}
+
+fn get_storage() -> PathBuf {
+    let home = home::home_dir().unwrap_or(PathBuf::from("."));
+    home.join(".tasks.bin")
+}
+
+fn load_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
+    if !storage.exists() {
+        let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {}", err));
+    }
+
+    match fs::read(storage) {
+        Ok(data) => {
+            if data.is_empty() {
+                dbg!("empty!");
+                return BTreeMap::new();
+            }
+
+            let data: BTreeMap<u64, Task> = match bincode2::deserialize(&data) {
+                Ok(data) => data,
+                Err(err) => {
+                    eprintln!("ERROR: {}", err);
+                    BTreeMap::new()
+                }
+            };
+
+            data
+        }
+        Err(err) => {
+            eprintln!("ERROR: {}", err);
+            BTreeMap::new()
+        }
+    }
+}
+
+fn save_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
+    match bincode2::serialize(&tasks) {
+        Ok(encoded) => fs::write(storage, encoded),
+        Err(err) => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("failed to serialise tasks: {}", err),
+            ))
+        }
+    }
 }
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    let home = home::home_dir().unwrap_or(PathBuf::from("."));
-    let filepath = home.join(".tasks.txt").to_string_lossy().to_string();
-
-    tasks_exists(&filepath)?;
+    let storage = get_storage();
+    let mut tasks = load_storage(&storage);
 
     match args.command {
-        Commands::List => list_all(&filepath),
-        Commands::New { tasks } => add_new(tasks, &filepath),
-        Commands::Done { indices } => {
-            if indices.len() == 1 && indices[0] == "all" {
-                delete_all(&filepath)
-            } else {
-                let mut indices_vec = Vec::new();
-
-                for idx in indices {
-                    match idx.parse::<u32>() {
-                        Ok(value) => indices_vec.push(value),
-                        Err(e) => eprintln!("Failed to parse index: {}: {}", idx, e),
-                    }
-                }
-
-                delete_todos(indices_vec, &filepath)
+        Commands::List => {
+            list_all(&tasks);
+            return Ok(());
+        }
+        Commands::Get { id } => {
+            get_task(id, &tasks);
+            return Ok(());
+        }
+        Commands::New => match add_new(&mut tasks) {
+            Ok(_) => save_storage(&storage, &tasks)?,
+            Err(err) => {
+                eprintln!("ERROR: {}", err);
             }
+        },
+        Commands::Done { indices } => {
+            delete_todos(&indices, &mut tasks);
+            save_storage(&storage, &tasks)?;
         }
-        Commands::Update { index, new_task } => update_task(index, new_task, &filepath),
-    }
-}
-
-fn add_new(tasks: Vec<String>, filepath: &str) -> Result<()> {
-    let content = match fs::read_to_string(filepath) {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Failed to read {filepath}: {err}");
-            return Err(err);
-        }
+        Commands::Update { index } => match update_task(index, &mut tasks) {
+            Ok(_) => save_storage(&storage, &tasks)?,
+            Err(err) => eprintln!("ERROR: {}", err),
+        },
     };
-
-    let mut count = content.lines().count();
-
-    let mut file = BufWriter::new(OpenOptions::new().read(true).append(true).open(filepath)?);
-    for task in tasks {
-        writeln!(&mut file, "{task}")?;
-        count += 1;
-        println!("Task {count} Added");
-    }
 
     Ok(())
 }
 
-fn list_all(filepath: &str) -> Result<()> {
-    let buf = match fs::read_to_string(filepath) {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Failed to read {filepath}: {err}");
-            return Err(err);
+fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
+    println!("Create new task. Enter heading on first line, body on subsequent lines.");
+    println!("End input with an empty line:");
+    let mut stdin = stdin().lock();
+    let mut lines = Vec::new();
+
+    loop {
+        let mut line = String::new();
+        let read = stdin.read_line(&mut line)?;
+        if read <= 1 || line.trim().is_empty() {
+            break;
         }
-    };
-    if buf.is_empty() {
-        println!("No Tasks!");
-        return Ok(());
-    }
-    let mut index = 1;
-    for line in buf.lines() {
-        println!("{index}: {line:?}");
-        index += 1;
+        lines.push(line);
     }
 
+    if lines.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "No input provided",
+        ));
+    }
+
+    let head = lines[0].trim().to_string();
+
+    let body = if lines.len() > 1 {
+        lines[1..].join("")
+    } else {
+        String::new()
+    };
+
+    let new_id = tasks.keys().next_back().map_or(1, |&id| id + 1);
+
+    let new_task = Task {
+        id: new_id,
+        head,
+        body,
+    };
+    tasks.insert(new_id, new_task);
     Ok(())
 }
 
-fn delete_all(filepath: &str) -> Result<()> {
-    OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(filepath)?;
-    println!("All Tasks Deleted!");
-    Ok(())
+fn get_task(id: u64, tasks: &BTreeMap<u64, Task>) {
+    if let Some(task) = tasks.get(&id) {
+        println!("ID: {}", task.id);
+        println!("Heading: {}", task.head);
+        println!("Body:\n{}", task.body);
+    } else {
+        eprintln!("Task with ID {} not found", id);
+    }
 }
 
-fn delete_todos(indexes: Vec<u32>, filepath: &str) -> Result<()> {
-    let content = match fs::read_to_string(filepath) {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Failed to read {filepath}: {err}");
-            return Err(err);
+fn list_all(tasks: &BTreeMap<u64, Task>) {
+    if tasks.is_empty() {
+        println!("No Tasks");
+    } else {
+        for task in tasks.values().into_iter() {
+            println!("ID: {} HEAD: {}", task.id, task.head);
         }
-    };
-    let mut i = 1;
-    let mut writer = BufWriter::new(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(filepath)?,
-    );
+    }
+}
 
-    for line in content.lines() {
-        if indexes.contains(&i) {
-            println!("Task {i} Deleted");
-            i += 1;
-            continue;
+fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
+    for id in indices {
+        if tasks.remove(&id).is_some() {
+            println!("Marked task {} as done!", id);
+        } else {
+            println!("Task {} not found!", id);
         }
-        let _ = writeln!(&mut writer, "{line}").map_err(|err| {
-            eprintln!("Failed to write line: {line} :{err}");
-        });
-        i += 1;
+    }
+}
+
+fn update_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
+    if !tasks.contains_key(&index) {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("Task with id {} not found", index),
+        ));
     }
 
-    Ok(())
-}
+    let current_task = tasks.get(&index).unwrap();
 
-fn update_task(index: u32, new_task: String, filepath: &str) -> Result<()> {
-    let mut i = 1;
-    let buf = match fs::read_to_string(filepath) {
-        Ok(val) => val,
-        Err(err) => {
-            eprintln!("Failed to read {filepath}: {err}");
-            return Err(err);
-        }
-    };
-    let mut writer = BufWriter::new(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(filepath)?,
-    );
+    let mut temp_file = tempfile::NamedTempFile::new()?;
+    writeln!(temp_file, "{}", current_task.head)?;
+    write!(temp_file, "{}", current_task.body)?;
+    temp_file.flush()?;
 
-    for mut line in buf.lines() {
-        if i == index {
-            line = &new_task;
-            println!("Task Updated");
-            println!("{i}: {line}");
-        }
+    let temp_path = temp_file.path().to_path_buf();
 
-        let _ = writeln!(&mut writer, "{line}").map_err(|err| {
-            eprintln!("Failed to write line: {line} :{err}");
-        });
-        i += 1;
+    let editor = std::env::var("EDITOR").unwrap_or("nvim".to_string());
+
+    let status = process::Command::new(&editor).arg(&temp_path).status()?;
+
+    if !status.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("{} exited with non zero status", editor),
+        ));
     }
 
-    Ok(())
-}
+    let content = fs::read_to_string(&temp_path)?;
+    let lines: Vec<&str> = content.lines().collect();
 
-fn tasks_exists(filepath: &str) -> Result<()> {
-    match fs::exists(filepath) {
-        Ok(_) => return Ok(()),
-        Err(_) => File::create(filepath)?,
+    if lines.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Task cannot be empty",
+        ));
+    }
+
+    let new_head = lines[0].to_string();
+
+    let new_body = if lines.len() > 1 {
+        lines[1..].join("")
+    } else {
+        String::new()
     };
 
+    let updated_task = Task {
+        id: index,
+        head: new_head,
+        body: new_body,
+    };
+
+    tasks.insert(index, updated_task);
     Ok(())
 }
