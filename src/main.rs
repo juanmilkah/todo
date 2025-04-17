@@ -43,7 +43,7 @@ enum Commands {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
     id: u64,
     head: String,
@@ -191,12 +191,31 @@ fn list_all(tasks: &BTreeMap<u64, Task>) {
 }
 
 fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
+    let mut deleted_any = false;
     for id in indices {
         if tasks.remove(&id).is_some() {
             println!("Marked task {} as done!", id);
+            deleted_any = true;
         } else {
             println!("Task {} not found!", id);
         }
+    }
+
+    if deleted_any {
+        reindex_tasks(tasks);
+    }
+}
+
+fn reindex_tasks(tasks: &mut BTreeMap<u64, Task>) {
+    let mut values: Vec<Task> = tasks.values().cloned().collect();
+    tasks.clear();
+
+    values.sort_by_key(|task| task.id);
+
+    for (new_id, task) in values.iter_mut().enumerate() {
+        let new_id = new_id as u64 + 1;
+        task.id = new_id;
+        tasks.insert(new_id, task.clone());
     }
 }
 
