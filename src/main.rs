@@ -63,7 +63,6 @@ fn load_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     match fs::read(storage) {
         Ok(data) => {
             if data.is_empty() {
-                dbg!("empty!");
                 return BTreeMap::new();
             }
 

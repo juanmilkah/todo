@@ -7,6 +7,4 @@ EX_PATH="/usr/local/bin/todo"
 sudo cp target/release/todo $EX_PATH 
 echo "Copied the executable to $EX_PATH"
 
-touch "$HOME/.tasks.txt"
-
 echo "RUN: todo help"
