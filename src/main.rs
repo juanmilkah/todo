@@ -19,7 +19,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Create new task.
-    New,
+    New {
+        /// Create a single line task
+        task: Option<String>,
+    },
 
     /// List all tasks heads
     List,
@@ -109,11 +112,17 @@ fn main() -> Result<()> {
             get_task(id, &tasks);
             return Ok(());
         }
-        Commands::New => match add_new(&mut tasks) {
-            Ok(_) => save_storage(&storage, &tasks)?,
-            Err(err) => {
-                eprintln!("ERROR: {}", err);
+        Commands::New { task } => match task {
+            Some(new_task) => {
+                add_one(&new_task, &mut tasks);
+                save_storage(&storage, &tasks)?;
             }
+            None => match add_new(&mut tasks) {
+                Ok(_) => save_storage(&storage, &tasks)?,
+                Err(err) => {
+                    eprintln!("ERROR: {}", err);
+                }
+            },
         },
         Commands::Done { indices } => {
             delete_todos(&indices, &mut tasks);
@@ -126,6 +135,19 @@ fn main() -> Result<()> {
     };
 
     Ok(())
+}
+
+fn add_one(task: &str, tasks: &mut BTreeMap<u64, Task>) {
+    let new_id = tasks.keys().next_back().map_or(1, |&id| id + 1);
+    let head = task.to_string();
+    let body = String::new();
+    let new_task = Task {
+        id: new_id,
+        head,
+        body,
+    };
+    tasks.insert(new_id, new_task);
+    println!("Task {} added!", new_id);
 }
 
 fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
@@ -144,10 +166,8 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     }
 
     if lines.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "No input provided",
-        ));
+        println!("New Task Aborted!");
+        return Ok(());
     }
 
     let head = lines[0].trim().to_string();

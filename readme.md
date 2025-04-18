@@ -18,7 +18,8 @@ bash build.sh
 - List all notes 
 
 ```bash
-todo new
+todo new 
+todo new "NEW TODO"
 todo list 
 todo done 3 1
 todo update 1
