@@ -192,8 +192,8 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 fn get_task(id: u64, tasks: &BTreeMap<u64, Task>) {
     if let Some(task) = tasks.get(&id) {
         println!("ID: {}", task.id);
-        println!("Heading: {}", task.head);
-        println!("Body:\n{}", task.body);
+        println!("HEAD: {}", task.head);
+        println!("BODY:\n{}", task.body);
     } else {
         eprintln!("Task with ID {} not found", id);
     }
@@ -204,7 +204,11 @@ fn list_all(tasks: &BTreeMap<u64, Task>) {
         println!("No Tasks");
     } else {
         for task in tasks.values().into_iter() {
-            println!("ID: {} HEAD: {}", task.id, task.head);
+            if task.body.is_empty() {
+                println!("{}. {}", task.id, task.head);
+            } else {
+                println!("{}. HEAD: {}", task.id, task.head);
+            }
         }
     }
 }
