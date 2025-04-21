@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{self, stdin, BufRead, Result, Write};
+use std::io::{self, Result, Write};
 use std::path::PathBuf;
 use std::{fs, process};
 
@@ -151,26 +151,30 @@ fn add_one(task: &str, tasks: &mut BTreeMap<u64, Task>) {
 }
 
 fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
-    println!("Create new task. Enter heading on first line, body on subsequent lines.");
-    println!("End input with an empty line:");
-    let mut stdin = stdin().lock();
-    let mut lines = Vec::new();
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    let _ = writeln!(file, "\n");
+    let temp_path = file.path().to_path_buf();
 
-    loop {
-        let mut line = String::new();
-        let read = stdin.read_line(&mut line)?;
-        if read <= 1 || line.trim().is_empty() {
-            break;
-        }
-        lines.push(line);
+    let editor = std::env::var("EDITOR").unwrap_or("nvim".to_string());
+
+    let status = process::Command::new(&editor).arg(&temp_path).status()?;
+
+    if !status.success() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("{} exited with non zero status", editor),
+        ));
     }
 
+    let content = fs::read_to_string(&temp_path)?;
+    let lines: Vec<&str> = content.lines().collect();
+
     if lines.is_empty() {
-        println!("New Task Aborted!");
+        println!("New Task aborted!");
         return Ok(());
     }
 
-    let head = lines[0].trim().to_string();
+    let head = lines[0].to_string();
 
     let body = if lines.len() > 1 {
         lines[1..].join("")
@@ -186,6 +190,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
         body,
     };
     tasks.insert(new_id, new_task);
+    println!("Task {new_id} Added!");
     Ok(())
 }
 
