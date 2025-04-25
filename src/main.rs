@@ -151,8 +151,7 @@ fn add_one(task: &str, tasks: &mut BTreeMap<u64, Task>) {
 }
 
 fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
-    let mut file = tempfile::NamedTempFile::new().unwrap();
-    let _ = writeln!(file, "\n");
+    let file = tempfile::NamedTempFile::new().unwrap();
     let temp_path = file.path().to_path_buf();
 
     let editor = std::env::var("EDITOR").unwrap_or("nvim".to_string());
@@ -177,7 +176,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     let head = lines[0].to_string();
 
     let body = if lines.len() > 1 {
-        lines[1..].join("")
+        lines[1..].join("\n")
     } else {
         String::new()
     };
