@@ -287,7 +287,7 @@ fn update_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     let new_head = lines[0].to_string();
 
     let new_body = if lines.len() > 1 {
-        lines[1..].join("")
+        lines[1..].join("\n")
     } else {
         String::new()
     };
