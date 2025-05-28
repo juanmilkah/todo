@@ -58,7 +58,7 @@ fn get_storage() -> PathBuf {
     home.join(".tasks.bin")
 }
 
-fn load_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
+fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     if !storage.exists() {
         let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {}", err));
     }
@@ -86,7 +86,7 @@ fn load_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     }
 }
 
-fn save_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
+fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
     match bincode2::serialize(&tasks) {
         Ok(encoded) => fs::write(storage, encoded),
         Err(err) => {
@@ -96,45 +96,6 @@ fn save_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
             ))
         }
     }
-}
-
-fn main() -> Result<()> {
-    let args = Cli::parse();
-    let storage = get_storage();
-    let mut tasks = load_storage(&storage);
-
-    match args.command {
-        Commands::List => {
-            list_all(&tasks);
-            return Ok(());
-        }
-        Commands::Get { id } => {
-            get_task(id, &tasks);
-            return Ok(());
-        }
-        Commands::New { task } => match task {
-            Some(new_task) => {
-                add_one(&new_task, &mut tasks);
-                save_storage(&storage, &tasks)?;
-            }
-            None => match add_new(&mut tasks) {
-                Ok(_) => save_storage(&storage, &tasks)?,
-                Err(err) => {
-                    eprintln!("ERROR: {}", err);
-                }
-            },
-        },
-        Commands::Done { indices } => {
-            delete_todos(&indices, &mut tasks);
-            save_storage(&storage, &tasks)?;
-        }
-        Commands::Update { index } => match update_task(index, &mut tasks) {
-            Ok(_) => save_storage(&storage, &tasks)?,
-            Err(err) => eprintln!("ERROR: {}", err),
-        },
-    };
-
-    Ok(())
 }
 
 fn add_one(task: &str, tasks: &mut BTreeMap<u64, Task>) {
@@ -263,25 +224,22 @@ fn update_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     let temp_path = temp_file.path().to_path_buf();
 
-    let editor = std::env::var("EDITOR").unwrap_or("nvim".to_string());
+    let editor = std::env::var("EDITOR").unwrap_or("vim".to_string());
 
     let status = process::Command::new(&editor).arg(&temp_path).status()?;
 
     if !status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("{} exited with non zero status", editor),
-        ));
+        return Err(io::Error::other(format!(
+            "{editor} exited with non zero status"
+        )));
     }
 
     let content = fs::read_to_string(&temp_path)?;
     let lines: Vec<&str> = content.lines().collect();
 
     if lines.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Task cannot be empty",
-        ));
+        delete_todos(&[index], tasks);
+        return Ok(());
     }
 
     let new_head = lines[0].to_string();
@@ -299,5 +257,44 @@ fn update_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     };
 
     tasks.insert(index, updated_task);
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let args = Cli::parse();
+    let storage = get_storage();
+    let mut tasks = load_from_storage(&storage);
+
+    match args.command {
+        Commands::List => {
+            list_all(&tasks);
+            return Ok(());
+        }
+        Commands::Get { id } => {
+            get_task(id, &tasks);
+            return Ok(());
+        }
+        Commands::New { task } => match task {
+            Some(new_task) => {
+                add_one(&new_task, &mut tasks);
+                save_to_storage(&storage, &tasks)?;
+            }
+            None => match add_new(&mut tasks) {
+                Ok(_) => save_to_storage(&storage, &tasks)?,
+                Err(err) => {
+                    eprintln!("ERROR: {}", err);
+                }
+            },
+        },
+        Commands::Done { indices } => {
+            delete_todos(&indices, &mut tasks);
+            save_to_storage(&storage, &tasks)?;
+        }
+        Commands::Update { index } => match update_task(index, &mut tasks) {
+            Ok(_) => save_to_storage(&storage, &tasks)?,
+            Err(err) => eprintln!("ERROR: {}", err),
+        },
+    };
+
     Ok(())
 }

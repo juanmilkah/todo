@@ -1,7 +1,7 @@
 [package]
 name = "todo"
 description = "A Commandline Tasks Manager"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Juan Milkah <juanmilkah@gmail.com>"]
 license = "GNU GPL3"
@@ -12,3 +12,10 @@ clap = { version = "4.5.32", features = ["derive"] }
 home ="0.5.11" 
 serde = { version = "1.0.219", features = ["derive"] }
 tempfile = "3.19.1"
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "s"

@@ -1,4 +1,6 @@
 #! /bin/bash
+set -e #Exit immediately on any error
+
 echo "building program..."
 cargo build --release
 
