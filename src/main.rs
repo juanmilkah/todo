@@ -21,7 +21,8 @@ enum Commands {
     /// Create new task.
     New {
         /// Create a single line task
-        task: Option<String>,
+        head: Option<String>,
+        body: Option<String>,
     },
 
     /// List all tasks heads
@@ -89,19 +90,17 @@ fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
 fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
     match bincode2::serialize(&tasks) {
         Ok(encoded) => fs::write(storage, encoded),
-        Err(err) => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("failed to serialise tasks: {}", err),
-            ))
-        }
+        Err(err) => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("failed to serialise tasks: {}", err),
+        )),
     }
 }
 
-fn add_one(task: &str, tasks: &mut BTreeMap<u64, Task>) {
+fn add_one(head: Option<String>, body: Option<String>, tasks: &mut BTreeMap<u64, Task>) {
     let new_id = tasks.keys().next_back().map_or(1, |&id| id + 1);
-    let head = task.to_string();
-    let body = String::new();
+    let head = head.unwrap_or_default();
+    let body = body.unwrap_or_default();
     let new_task = Task {
         id: new_id,
         head,
@@ -120,10 +119,10 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     let status = process::Command::new(&editor).arg(&temp_path).status()?;
 
     if !status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("{} exited with non zero status", editor),
-        ));
+        return Err(io::Error::other(format!(
+            "{} exited with non zero status",
+            editor
+        )));
     }
 
     let content = fs::read_to_string(&temp_path)?;
@@ -168,7 +167,7 @@ fn list_all(tasks: &BTreeMap<u64, Task>) {
     if tasks.is_empty() {
         println!("No Tasks");
     } else {
-        for task in tasks.values().into_iter() {
+        for task in tasks.values() {
             if task.body.is_empty() {
                 println!("{}. {}", task.id, task.head);
             } else {
@@ -181,7 +180,7 @@ fn list_all(tasks: &BTreeMap<u64, Task>) {
 fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
     let mut deleted_any = false;
     for id in indices {
-        if tasks.remove(&id).is_some() {
+        if tasks.remove(id).is_some() {
             println!("Marked task {} as done!", id);
             deleted_any = true;
         } else {
@@ -274,18 +273,16 @@ fn main() -> Result<()> {
             get_task(id, &tasks);
             return Ok(());
         }
-        Commands::New { task } => match task {
-            Some(new_task) => {
-                add_one(&new_task, &mut tasks);
+        Commands::New { head, body } => {
+            if head.is_none() && body.is_none() {
+                add_new(&mut tasks)?;
                 save_to_storage(&storage, &tasks)?;
+                return Ok(());
             }
-            None => match add_new(&mut tasks) {
-                Ok(_) => save_to_storage(&storage, &tasks)?,
-                Err(err) => {
-                    eprintln!("ERROR: {}", err);
-                }
-            },
-        },
+
+            add_one(head, body, &mut tasks);
+            save_to_storage(&storage, &tasks)?;
+        }
         Commands::Done { indices } => {
             delete_todos(&indices, &mut tasks);
             save_to_storage(&storage, &tasks)?;

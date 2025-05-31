@@ -1,12 +1,11 @@
 # Todo
 
 Take notes on the commandline.
-As of this time only linux based platforms are supported.
-Feel free to contribute to support other platforms.
+Unix based environments only :)
 
 ## Installation
 Clone the github repository
-Build the program.
+Build the program and install to `/usr/local/bin`.
 ```bash
 bash build.sh
 ```
@@ -18,11 +17,11 @@ bash build.sh
 - List all notes 
 
 ```bash
-todo new 
-todo new "NEW TODO"
+todo new [heading] [body]
+todo get <id>
 todo list 
-todo done 3 1
-todo update 1
+todo done <id...>
+todo update <id>
 ```
 
 ## Usage
