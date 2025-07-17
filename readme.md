@@ -21,7 +21,6 @@ todo new [heading] [body]
 todo get <id>
 todo list 
 todo done <id...>
-todo update <id>
 ```
 
 ## Usage

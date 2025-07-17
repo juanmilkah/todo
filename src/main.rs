@@ -28,7 +28,7 @@ enum Commands {
     /// List all tasks heads
     List,
 
-    /// Get the full task
+    /// Get && Update a task
     Get {
         /// Task Id
         id: u64,
@@ -38,12 +38,6 @@ enum Commands {
     Done {
         /// Task id(s) to delete.
         indices: Vec<u64>,
-    },
-
-    /// Update a task at the given index
-    Update {
-        /// The index of the task to update
-        index: u64,
     },
 }
 
@@ -61,7 +55,7 @@ fn get_storage() -> PathBuf {
 
 fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     if !storage.exists() {
-        let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {}", err));
+        let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {err}"));
     }
 
     match fs::read(storage) {
@@ -73,7 +67,7 @@ fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
             let data: BTreeMap<u64, Task> = match bincode2::deserialize(&data) {
                 Ok(data) => data,
                 Err(err) => {
-                    eprintln!("ERROR: {}", err);
+                    eprintln!("ERROR: {err}");
                     BTreeMap::new()
                 }
             };
@@ -81,7 +75,7 @@ fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
             data
         }
         Err(err) => {
-            eprintln!("ERROR: {}", err);
+            eprintln!("ERROR: {err}");
             BTreeMap::new()
         }
     }
@@ -92,7 +86,7 @@ fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()>
         Ok(encoded) => fs::write(storage, encoded),
         Err(err) => Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("failed to serialise tasks: {}", err),
+            format!("failed to serialise tasks: {err}"),
         )),
     }
 }
@@ -107,7 +101,7 @@ fn add_one(head: Option<String>, body: Option<String>, tasks: &mut BTreeMap<u64,
         body,
     };
     tasks.insert(new_id, new_task);
-    println!("Task {} added!", new_id);
+    println!("Task {new_id} added!");
 }
 
 fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
@@ -120,8 +114,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     if !status.success() {
         return Err(io::Error::other(format!(
-            "{} exited with non zero status",
-            editor
+            "{editor} exited with non zero status"
         )));
     }
 
@@ -153,17 +146,6 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     Ok(())
 }
 
-fn get_task(id: u64, tasks: &BTreeMap<u64, Task>) {
-    if let Some(task) = tasks.get(&id) {
-        println!("{}", task.head);
-        if !task.body.is_empty() {
-            println!("{}", task.body);
-        }
-    } else {
-        eprintln!("Task with ID {} not found", id);
-    }
-}
-
 fn list_all(tasks: &BTreeMap<u64, Task>) {
     if tasks.is_empty() {
         println!("No Tasks");
@@ -182,10 +164,10 @@ fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
     let mut deleted_any = false;
     for id in indices {
         if tasks.remove(id).is_some() {
-            println!("Marked task {} as done!", id);
+            println!("Marked task {id} as done!");
             deleted_any = true;
         } else {
-            println!("Task {} not found!", id);
+            println!("Task {id} not found!");
         }
     }
 
@@ -207,11 +189,11 @@ fn reindex_tasks(tasks: &mut BTreeMap<u64, Task>) {
     }
 }
 
-fn update_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
+fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     if !tasks.contains_key(&index) {
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Task with id {} not found", index),
+            format!("Task with id {index} not found"),
         ));
     }
 
@@ -270,29 +252,20 @@ fn main() -> Result<()> {
             list_all(&tasks);
             return Ok(());
         }
-        Commands::Get { id } => {
-            get_task(id, &tasks);
-            return Ok(());
-        }
+        Commands::Get { id } => get_task(id, &mut tasks)?,
         Commands::New { head, body } => {
             if head.is_none() && body.is_none() {
                 add_new(&mut tasks)?;
-                save_to_storage(&storage, &tasks)?;
-                return Ok(());
+            } else {
+                add_one(head, body, &mut tasks);
             }
-
-            add_one(head, body, &mut tasks);
-            save_to_storage(&storage, &tasks)?;
         }
         Commands::Done { indices } => {
             delete_todos(&indices, &mut tasks);
-            save_to_storage(&storage, &tasks)?;
         }
-        Commands::Update { index } => match update_task(index, &mut tasks) {
-            Ok(_) => save_to_storage(&storage, &tasks)?,
-            Err(err) => eprintln!("ERROR: {}", err),
-        },
     };
+
+    save_to_storage(&storage, &tasks)?;
 
     Ok(())
 }
