@@ -2,8 +2,9 @@
 name = "todo"
 description = "A Commandline Tasks Manager"
 version = "0.3.0"
-edition = "2021"
-authors = ["Juan Milkah <juanmilkah@gmail.com>"]
+edition = "2024"
+authors = ["Juan Milkah <juanmilkah@proton.me>"]
+repository = "https://github.com/juanmilkah/todo"
 license = "GNU GPL3"
 
 [dependencies]
@@ -18,3 +19,4 @@ codegen-units = 1
 strip = true
 lto = "thin"
 panic = "abort"
+opt-level = "s"

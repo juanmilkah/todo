@@ -56,24 +56,12 @@ fn get_storage() -> PathBuf {
 fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     if !storage.exists() {
         let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {err}"));
+        return BTreeMap::new();
     }
 
     match fs::read(storage) {
-        Ok(data) => {
-            if data.is_empty() {
-                return BTreeMap::new();
-            }
-
-            let data: BTreeMap<u64, Task> = match bincode2::deserialize(&data) {
-                Ok(data) => data,
-                Err(err) => {
-                    eprintln!("ERROR: {err}");
-                    BTreeMap::new()
-                }
-            };
-
-            data
-        }
+        Ok(data) if data.is_empty() => BTreeMap::new(),
+        Ok(data) => bincode2::deserialize(&data).unwrap_or_default(),
         Err(err) => {
             eprintln!("ERROR: {err}");
             BTreeMap::new()
@@ -92,13 +80,11 @@ fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()>
 }
 
 fn add_one(head: Option<String>, body: Option<String>, tasks: &mut BTreeMap<u64, Task>) {
-    let new_id = tasks.keys().next_back().map_or(1, |&id| id + 1);
-    let head = head.unwrap_or_default();
-    let body = body.unwrap_or_default();
+    let new_id = (tasks.len() + 1) as u64;
     let new_task = Task {
         id: new_id,
-        head,
-        body,
+        head: head.unwrap_or_default(),
+        body: body.unwrap_or_default(),
     };
     tasks.insert(new_id, new_task);
     println!("Task {new_id} added!");
@@ -134,7 +120,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
         String::new()
     };
 
-    let new_id = tasks.keys().next_back().map_or(1, |&id| id + 1);
+    let new_id = (tasks.len() + 1) as u64;
 
     let new_task = Task {
         id: new_id,
@@ -206,7 +192,15 @@ fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     let temp_path = temp_file.path().to_path_buf();
 
-    let editor = std::env::var("EDITOR").unwrap_or("vim".to_string());
+    let editor = match std::env::var("EDITOR") {
+        Ok(e) => e,
+        Err(_) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Env variable EDITOR not specified",
+            ))
+        }
+    };
 
     let status = process::Command::new(&editor).arg(&temp_path).status()?;
 
