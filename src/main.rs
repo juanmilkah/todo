@@ -1,3 +1,7 @@
+//! A Minimalistic task manager
+// The main crate for the task manager application.
+// It provides a command-line interface to manage tasks.
+
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Result, Write};
@@ -7,15 +11,19 @@ use std::{fs, process};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
+// The version of the application, retrieved from the Cargo.toml file.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The main command-line interface for the task manager.
 #[derive(Parser)]
 #[command(version = VERSION, about = "A Minimalistic task manager", long_about = None)]
 struct Cli {
+    /// The command to execute.
     #[command(subcommand)]
     command: Commands,
 }
 
+/// The available commands for the task manager.
 #[derive(Subcommand)]
 enum Commands {
     /// Create new task.
@@ -41,18 +49,27 @@ enum Commands {
     },
 }
 
+/// A task with an id, head, and body.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Task {
+    /// The id of the task.
     id: u64,
+    /// The head of the task.
     head: String,
+    /// The body of the task.
     body: String,
 }
 
+/// Returns the path to the storage file.
 fn get_storage() -> PathBuf {
     let home = home::home_dir().unwrap_or(PathBuf::from("."));
     home.join(".tasks.bin")
 }
 
+/// Loads tasks from the storage file.
+/// If the storage file does not exist, it creates it.
+/// If the storage file is empty, it returns an empty BTreeMap.
+/// If the storage file is corrupted, it returns an empty BTreeMap.
 fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     if !storage.exists() {
         let _ = File::create(storage).map_err(|err| eprintln!("ERROR: {err}"));
@@ -69,6 +86,7 @@ fn load_from_storage(storage: &PathBuf) -> BTreeMap<u64, Task> {
     }
 }
 
+/// Saves tasks to the storage file.
 fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()> {
     match bincode2::serialize(&tasks) {
         Ok(encoded) => fs::write(storage, encoded),
@@ -79,6 +97,7 @@ fn save_to_storage(storage: &PathBuf, tasks: &BTreeMap<u64, Task>) -> Result<()>
     }
 }
 
+/// Adds a new task with a head and body.
 fn add_one(head: Option<String>, body: Option<String>, tasks: &mut BTreeMap<u64, Task>) {
     let new_id = (tasks.len() + 1) as u64;
     let new_task = Task {
@@ -90,6 +109,7 @@ fn add_one(head: Option<String>, body: Option<String>, tasks: &mut BTreeMap<u64,
     println!("Task {new_id} added!");
 }
 
+/// Adds a new task by opening the default editor.
 fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     let file = tempfile::NamedTempFile::new().unwrap();
     let temp_path = file.path().to_path_buf();
@@ -109,7 +129,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     if lines.is_empty() {
         println!("New Task aborted!");
-        return Ok(());
+        return Ok(())
     }
 
     let head = lines[0].to_string();
@@ -132,6 +152,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     Ok(())
 }
 
+/// Lists all tasks.
 fn list_all(tasks: &BTreeMap<u64, Task>) {
     if tasks.is_empty() {
         println!("No Tasks");
@@ -146,6 +167,8 @@ fn list_all(tasks: &BTreeMap<u64, Task>) {
     }
 }
 
+/// Deletes todos by their indices.
+/// If a task is deleted, it re-indexes the tasks.
 fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
     let mut deleted_any = false;
     for id in indices {
@@ -162,6 +185,7 @@ fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
     }
 }
 
+/// Re-indexes the tasks to fill in the gaps from deleted tasks.
 fn reindex_tasks(tasks: &mut BTreeMap<u64, Task>) {
     let mut values: Vec<Task> = tasks.values().cloned().collect();
     tasks.clear();
@@ -175,6 +199,9 @@ fn reindex_tasks(tasks: &mut BTreeMap<u64, Task>) {
     }
 }
 
+/// Gets a task by its index and opens it in the default editor.
+/// If the task is modified, it updates the task.
+/// If the task is empty, it deletes the task.
 fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     if !tasks.contains_key(&index) {
         return Err(io::Error::new(
@@ -198,7 +225,7 @@ fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Env variable EDITOR not specified",
-            ))
+            ));
         }
     };
 
@@ -215,7 +242,7 @@ fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     if lines.is_empty() {
         delete_todos(&[index], tasks);
-        return Ok(());
+        return Ok(())
     }
 
     let new_head = lines[0].to_string();
@@ -236,6 +263,7 @@ fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
     Ok(())
 }
 
+/// The main function for the task manager.
 fn main() -> Result<()> {
     let args = Cli::parse();
     let storage = get_storage();
@@ -244,7 +272,7 @@ fn main() -> Result<()> {
     match args.command {
         Commands::List => {
             list_all(&tasks);
-            return Ok(());
+            return Ok(())
         }
         Commands::Get { id } => get_task(id, &mut tasks)?,
         Commands::New { head, body } => {
