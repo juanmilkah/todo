@@ -28,8 +28,9 @@ struct Cli {
 enum Commands {
     /// Create new task.
     New {
-        /// Create a single line task
+        /// The Title of the task
         head: Option<String>,
+        /// The Body section of the new task
         body: Option<String>,
     },
 
@@ -50,7 +51,7 @@ enum Commands {
 }
 
 /// A task with an id, head, and body.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Task {
     /// The id of the task.
     id: u64,
@@ -129,7 +130,7 @@ fn add_new(tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     if lines.is_empty() {
         println!("New Task aborted!");
-        return Ok(())
+        return Ok(());
     }
 
     let head = lines[0].to_string();
@@ -187,15 +188,14 @@ fn delete_todos(indices: &[u64], tasks: &mut BTreeMap<u64, Task>) {
 
 /// Re-indexes the tasks to fill in the gaps from deleted tasks.
 fn reindex_tasks(tasks: &mut BTreeMap<u64, Task>) {
-    let mut values: Vec<Task> = tasks.values().cloned().collect();
+    // These values come in order by key
+    let values = tasks.values().cloned().collect::<Vec<Task>>();
     tasks.clear();
 
-    values.sort_by_key(|task| task.id);
-
-    for (new_id, task) in values.iter_mut().enumerate() {
+    for (new_id, mut task) in values.into_iter().enumerate() {
         let new_id = new_id as u64 + 1;
         task.id = new_id;
-        tasks.insert(new_id, task.clone());
+        tasks.insert(new_id, task);
     }
 }
 
@@ -242,7 +242,7 @@ fn get_task(index: u64, tasks: &mut BTreeMap<u64, Task>) -> Result<()> {
 
     if lines.is_empty() {
         delete_todos(&[index], tasks);
-        return Ok(())
+        return Ok(());
     }
 
     let new_head = lines[0].to_string();
@@ -272,7 +272,7 @@ fn main() -> Result<()> {
     match args.command {
         Commands::List => {
             list_all(&tasks);
-            return Ok(())
+            return Ok(());
         }
         Commands::Get { id } => get_task(id, &mut tasks)?,
         Commands::New { head, body } => {
