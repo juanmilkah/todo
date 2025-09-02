@@ -15,7 +15,6 @@ serde = { version = "1.0.219", features = ["derive"] }
 tempfile = "3.19.1"
 
 [profile.release]
-codegen-units = 1
 strip = true
 lto = "thin"
 opt-level = "s"

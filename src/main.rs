@@ -81,7 +81,7 @@ type Id = u64;
 type Slot = usize;
 
 /// A task with an id, head, and body.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 struct Task {
     /// A unique identifier for the task
     id: Id,
@@ -364,7 +364,13 @@ fn get_task(index: u64, data: &mut Storage) -> Result<(), io::Error> {
         body: new_body,
     };
 
-    data.store[*slot] = updated_task;
+    if *current_task != updated_task {
+        data.store[*slot] = updated_task.clone();
+        println!("Task {} updated!", &updated_task.id);
+    } else {
+        println!("Task {} not updated!", &updated_task.id);
+    }
+
     Ok(())
 }
 
