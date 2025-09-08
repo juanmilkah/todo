@@ -179,29 +179,27 @@ fn get_next_slot(data: &mut Storage) -> usize {
     let taken_slots = data.id_to_slot.values().cloned().collect::<Vec<usize>>();
     let l = data.store.len();
     let t = taken_slots.len();
-    if t < l {
-        return t;
-    }
     if t == l {
         let new_len = l * 2;
         data.store.resize(new_len, Task::default());
     }
 
-    data.store
-        .iter()
-        .enumerate()
-        .find(|(i, _s)| !taken_slots.contains(i))
-        .map(|(i, _)| i)
+    (0..data.store.len())
+        .find(|i| !taken_slots.contains(i))
+        .map(|i| i)
         .unwrap() // For Now I don't think would ever miss a slot
 }
 
 /// Adds a new task with a head and body.
 fn add_one(head: Option<String>, body: Option<String>, data: &mut Storage) {
     let new_id = (data.id_to_slot.len() + 1) as u64;
+    let head = head.unwrap_or_default().trim().to_string();
+    let body = body.unwrap_or_default().trim().to_string();
+
     let new_task = Task {
         id: new_id,
-        head: head.unwrap_or_default(),
-        body: body.unwrap_or_default(),
+        head,
+        body,
     };
     let slot = get_next_slot(data);
     data.store[slot] = new_task;
@@ -278,9 +276,9 @@ fn delete_todos(indices: &[u64], data: &mut Storage) {
         .into_iter()
         .for_each(|id| {
             let slot = *data.id_to_slot.get(&id).unwrap();
-            data.store[slot] = Task::default();
+            let _ = std::mem::replace(&mut data.store[slot], Task::default());
             let _ = data.id_to_slot.remove(&id);
-            println!("Marked task {id} as done!");
+            println!("Task {id} Deleted!");
             should_reindex = true;
         });
 
