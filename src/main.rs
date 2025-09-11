@@ -98,13 +98,16 @@ struct Storage {
     /// A mapping of the task id `Id` to the index slot in the
     /// tasks array
     id_to_slot: BTreeMap<Id, Slot>,
+    /// The In-Memory storage has unsynched changes to the disk
+    is_dirty: bool,
 }
 
 impl Default for Storage {
     fn default() -> Self {
         Self {
             store: vec![Task::default(); INITIAL_TASKS_ARRAY_LENGTH],
-            id_to_slot: Default::default(),
+            id_to_slot: BTreeMap::new(),
+            is_dirty: false,
         }
     }
 }
@@ -195,6 +198,9 @@ fn add_one(head: Option<String>, body: Option<String>, data: &mut Storage) {
     let new_id = (data.id_to_slot.len() + 1) as u64;
     let head = head.unwrap_or_default().trim().to_string();
     let body = body.unwrap_or_default().trim().to_string();
+    if head.is_empty() && body.is_empty() {
+        return;
+    }
 
     let new_task = Task {
         id: new_id,
@@ -204,6 +210,7 @@ fn add_one(head: Option<String>, body: Option<String>, data: &mut Storage) {
     let slot = get_next_slot(data);
     data.store[slot] = new_task;
     data.id_to_slot.insert(new_id, slot);
+    data.is_dirty = true;
     println!("Task {new_id} added!");
 }
 
@@ -266,8 +273,6 @@ fn list_all(data: &Storage) {
 /// If a task is deleted, it re-indexes the mapping of task id
 /// to slots in the tasks array.
 fn delete_todos(indices: &[u64], data: &mut Storage) {
-    let mut should_reindex = false;
-
     indices
         .iter()
         .filter(|id| data.id_to_slot.contains_key(id))
@@ -279,10 +284,10 @@ fn delete_todos(indices: &[u64], data: &mut Storage) {
             let _ = std::mem::replace(&mut data.store[slot], Task::default());
             let _ = data.id_to_slot.remove(&id);
             println!("Task {id} Deleted!");
-            should_reindex = true;
+            data.is_dirty = true;
         });
 
-    if !should_reindex {
+    if !data.is_dirty {
         return;
     }
 
@@ -306,10 +311,7 @@ fn delete_todos(indices: &[u64], data: &mut Storage) {
 /// If the task is empty, it deletes the task.
 fn get_task(index: u64, data: &mut Storage) -> Result<(), io::Error> {
     if !data.id_to_slot.contains_key(&index) {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("Task with id {index} not found"),
-        ));
+        return Err(io::Error::other(format!("Task with id {index} not found")));
     }
 
     let slot = data.id_to_slot.get(&index).unwrap();
@@ -363,8 +365,9 @@ fn get_task(index: u64, data: &mut Storage) -> Result<(), io::Error> {
     };
 
     if *current_task != updated_task {
-        data.store[*slot] = updated_task.clone();
         println!("Task {} updated!", &updated_task.id);
+        data.store[*slot] = updated_task;
+        data.is_dirty = true;
     } else {
         println!("Task {} not updated!", &updated_task.id);
     }
@@ -411,7 +414,9 @@ fn main() -> Result<(), io::Error> {
     };
 
     // save the current state to disk
-    save_to_storage(&storage_path, &data)?;
+    if data.is_dirty {
+        save_to_storage(&storage_path, &data)?;
+    }
 
     Ok(())
 }
