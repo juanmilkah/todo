@@ -202,7 +202,6 @@ fn get_next_slot(data: &mut Storage) -> usize {
 
     (0..data.store.len())
         .find(|i| !taken_slots.contains(i))
-        .map(|i| i)
         .unwrap() // For Now I don't think would ever miss a slot
 }
 
@@ -294,7 +293,7 @@ fn delete_todos(indices: &[u64], data: &mut Storage) {
         .into_iter()
         .for_each(|id| {
             let slot = *data.id_to_slot.get(&id).unwrap();
-            let _ = std::mem::replace(&mut data.store[slot], Task::default());
+            let _ = std::mem::take(&mut data.store[slot]);
             let _ = data.id_to_slot.remove(&id);
             println!("Task {id} Deleted!");
             data.is_dirty = true;
