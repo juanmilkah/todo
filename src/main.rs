@@ -134,11 +134,30 @@ fn get_storage() -> Result<PathBuf, String> {
 
 fn get_backup_path(storage_path: &Path) -> Result<PathBuf, String> {
     let mut backup_path = storage_path.to_path_buf().clone();
-    backup_path.set_extension(".bin.bak");
+    backup_path.set_extension("bin.bak");
     if !backup_path.exists() {
         File::create(&backup_path).map_err(|err| format!("Failed to create backup file: {err}"))?;
     }
     Ok(backup_path)
+}
+
+/// Copies the file contents from the original storage path
+/// to a backup location.
+fn backup_data(storage_path: &PathBuf) {
+    let backup_file = get_backup_path(storage_path)
+        .map_err(|_err| eprintln!("Err Saving backup!"))
+        .unwrap();
+
+    match fs::copy(storage_path, &backup_file) {
+        Err(err) => eprintln!(
+            "Failed to save data to backup file: {}, {}",
+            backup_file.display(),
+            err
+        ),
+        Ok(_) => {
+            println!("Data saved to a backup file: {}", backup_file.display());
+        }
+    }
 }
 
 /// Loads tasks from the storage file.
@@ -147,19 +166,13 @@ fn get_backup_path(storage_path: &Path) -> Result<PathBuf, String> {
 fn load_from_storage(storage_path: &PathBuf) -> Storage {
     match fs::read(storage_path) {
         Ok(data) if data.is_empty() => Storage::default(),
-        Ok(data) => bincode2::deserialize(&data).unwrap_or_default(),
+        Ok(data) => bincode2::deserialize(&data)
+            .map_err(|_| backup_data(storage_path))
+            .unwrap_or_default(),
         Err(err) => {
             eprintln!("ERROR: {err}");
             // save the old data to a backup file
-            if let Ok(backup_file) = get_backup_path(storage_path)
-                && let Err(err) = fs::copy(storage_path, &backup_file)
-            {
-                eprintln!(
-                    "Failed to save data to backup file: {}, {}",
-                    backup_file.display(),
-                    err
-                );
-            }
+            backup_data(storage_path);
 
             Storage::default()
         }
