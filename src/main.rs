@@ -30,6 +30,8 @@ use std::path::{Path, PathBuf};
 use std::{fs, process};
 
 use clap::{Parser, Subcommand};
+use flate2::Compression;
+use flate2::write::{ZlibDecoder, ZlibEncoder};
 use serde::{Deserialize, Serialize};
 
 /// The version of the application, retrieved from the Cargo.toml file.
@@ -166,9 +168,14 @@ fn backup_data(storage_path: &PathBuf) {
 fn load_from_storage(storage_path: &PathBuf) -> Storage {
     match fs::read(storage_path) {
         Ok(data) if data.is_empty() => Storage::default(),
-        Ok(data) => bincode2::deserialize(&data)
-            .map_err(|_| backup_data(storage_path))
-            .unwrap_or_default(),
+        Ok(data) => {
+            let data = decompress(&data)
+                .map_err(|_| backup_data(storage_path))
+                .unwrap_or_default();
+            bincode2::deserialize(&data)
+                .map_err(|_| backup_data(storage_path))
+                .unwrap_or_default()
+        }
         Err(err) => {
             eprintln!("ERROR: {err}");
             // save the old data to a backup file
@@ -179,15 +186,31 @@ fn load_from_storage(storage_path: &PathBuf) -> Storage {
     }
 }
 
+/// Decompress the data from storage before deserialization
+fn decompress(data: &[u8]) -> io::Result<Vec<u8>> {
+    let mut decoder = ZlibDecoder::new(Vec::new());
+    decoder.write_all(data)?;
+    decoder.finish()
+}
+
 /// Saves tasks to the storage file.
-fn save_to_storage(storage_path: &PathBuf, data: &Storage) -> Result<(), io::Error> {
-    match bincode2::serialize(&data) {
-        Ok(encoded) => fs::write(storage_path, encoded),
-        Err(err) => Err(io::Error::new(
+fn save_to_storage(storage_path: &PathBuf, data: &Storage) -> io::Result<()> {
+    let encoded = bincode2::serialize(&data).map_err(|err| {
+        io::Error::new(
             io::ErrorKind::InvalidData,
             format!("failed to serialise tasks: {err}"),
-        )),
-    }
+        )
+    })?;
+
+    let data = compress_data(&encoded)?;
+    fs::write(storage_path, data)
+}
+
+/// Compress the data before saving to the storage file
+fn compress_data(data: &[u8]) -> io::Result<Vec<u8>> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(data)?;
+    encoder.finish()
 }
 
 // Get the next available slot in the tasks array to insert a new entry

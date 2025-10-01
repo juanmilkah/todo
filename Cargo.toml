@@ -10,6 +10,7 @@ license = "GNU GPL3"
 [dependencies]
 bincode2 = "2.0.1"
 clap = { version = "4.5.32", features = ["derive"] }
+flate2 = "1.1.2"
 home ="0.5.11" 
 serde = { version = "1.0.219", features = ["derive"] }
 tempfile = "3.19.1"
