@@ -34,10 +34,16 @@ todo add "Review pull requests" "The code looks good to me"
 
 # Get task by Id
 ```bash
+# Get a task by it's Id and print it to the stdout
+todo get 1
+```
+
+# Update a task by it's Id
+```bash
 # Edit an existing task in your `$EDITOR`.  
 # Modify content and save → updates task  
 # Leave file blank → deletes task  
-todo get 1
+todo edit 1
 ```
 
 # List all tasks
@@ -55,20 +61,12 @@ todo done 1 2
 todo help
 ```
 
-
 ## Build and Install
 ### Automated Script (Linux)
 
-Make the script executable and run it to compile in release mode and install to `/usr/local/bin/todo`:
-
 ```bash
-chmod +x build.sh
 ./build.sh
 ```
-
-By default, `build.sh` uses:
-- `cargo build --release`  
-- `sudo cp target/release/todo /usr/local/bin/todo`
 
 ### Development
 

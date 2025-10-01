@@ -64,8 +64,14 @@ enum Commands {
     /// List all tasks heads
     List,
 
-    /// Get && Update a task
+    /// Get a task
     Get {
+        /// Task Id
+        id: u64,
+    },
+
+    /// Update a task
+    Edit {
         /// Task Id
         id: u64,
     },
@@ -285,6 +291,18 @@ fn add_new(data: &mut Storage) -> Result<(), io::Error> {
     Ok(())
 }
 
+/// Get a task by it's Id
+fn get_task(id: u64, data: &Storage) {
+    let slot = data.id_to_slot.get(&id);
+    match slot {
+        Some(s) => {
+            let task = &data.store[*s];
+            println!("ID: {}\nHEAD: {}\nBODY: {}", task.id, task.head, task.body);
+        }
+        None => eprintln!("Task not Found!"),
+    }
+}
+
 /// Lists all tasks.
 fn list_all(data: &Storage) {
     let slots = data.id_to_slot.values().cloned().collect::<Vec<Slot>>();
@@ -344,7 +362,7 @@ fn delete_todos(indices: &[u64], data: &mut Storage) {
 /// Gets a task by its index and opens it in the default editor.
 /// If the task is modified, it updates the task.
 /// If the task is empty, it deletes the task.
-fn get_task(index: u64, data: &mut Storage) -> Result<(), io::Error> {
+fn edit_task(index: u64, data: &mut Storage) -> Result<(), io::Error> {
     if !data.id_to_slot.contains_key(&index) {
         return Err(io::Error::other(format!("Task with id {index} not found")));
     }
@@ -433,7 +451,9 @@ fn main() -> Result<(), io::Error> {
             return Ok(());
         }
 
-        Commands::Get { id } => get_task(id, &mut data)?,
+        Commands::Edit { id } => edit_task(id, &mut data)?,
+
+        Commands::Get { id } => get_task(id, &data),
 
         Commands::New { head, body } => {
             if head.is_none() && body.is_none() {
