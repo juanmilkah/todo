@@ -33,6 +33,7 @@ use clap::{Parser, Subcommand};
 use flate2::Compression;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use serde::{Deserialize, Serialize};
+use tabled::{Table, Tabled};
 
 /// The version of the application, retrieved from the Cargo.toml file.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -89,7 +90,8 @@ type Id = u64;
 type Slot = usize;
 
 /// A task with an id, head, and body.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 struct Task {
     /// A unique identifier for the task
     id: Id,
@@ -297,7 +299,8 @@ fn get_task(id: u64, data: &Storage) {
     match slot {
         Some(s) => {
             let task = &data.store[*s];
-            println!("ID: {}\nHEAD: {}\nBODY: {}", task.id, task.head, task.body);
+            let task = Table::new(&[task]);
+            println!("{task}");
         }
         None => eprintln!("Task not Found!"),
     }
@@ -310,16 +313,13 @@ fn list_all(data: &Storage) {
         println!("No Tasks!");
     }
 
-    slots
+    let tasks = slots
         .iter()
         .map(|slot| &data.store[*slot])
-        .for_each(|task| {
-            if task.body.is_empty() {
-                println!("{}. {}", task.id, task.head);
-            } else {
-                println!("{}. HEAD: {}", task.id, task.head);
-            }
-        })
+        .collect::<Vec<&Task>>();
+
+    let table = Table::new(tasks);
+    println!("{}", table);
 }
 
 /// Deletes todos by their indices.
