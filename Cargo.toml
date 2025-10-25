@@ -13,7 +13,6 @@ clap = { version = "4.5.32", features = ["derive"] }
 flate2 = "1.1.2"
 home ="0.5.11" 
 serde = { version = "1.0.219", features = ["derive"] }
-tabled = "0.20.0"
 tempfile = "3.19.1"
 
 [profile.release]
