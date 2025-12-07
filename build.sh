@@ -5,10 +5,11 @@ echo "building program..."
 cargo build --release
 
 # Linux build
-EX_DIR="$HOME/.local/bin/"
+EX_DIR="$HOME/.local/bin"
 EX_PATH="$EX_DIR/todo"
 
-mkdir -p EX_DIR
+mkdir $HOME/.local -p 
+mkdir $HOME/.local/bin -p 
 
 cp target/release/todo $EX_PATH 
 echo "Copied the executable to $EX_PATH"
